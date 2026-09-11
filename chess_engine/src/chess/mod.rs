@@ -1,4 +1,4 @@
-const KING_PROXIMITY_WEIGHT: f64 = 0.1;
+const KING_PROXIMITY_WEIGHT: f64 = 0.05;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BoardState {

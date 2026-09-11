@@ -126,6 +126,8 @@ async fn main() {
     buttons.insert("white mode", spawn_white_mode_button());
     buttons.insert("black mode", spawn_black_mode_button());
     buttons.insert("random mode", spawn_random_mode_button());
+
+    buttons.insert("result window", spawn_game_winner_button());
     
     buttons.get_mut("friend mode").expect("No friend button").visible = true;
     buttons.get_mut("computer mode").expect("No computer button").visible = true;
@@ -419,6 +421,21 @@ async fn main() {
                 buttons.get_mut("evaluation").expect("No evaluation button").text = " -- ".to_string();
             }
         } 
+
+        // showinng the result of the game if there are no legal moves left
+        if board_state.get_legal_moves().len() == 0 {
+            buttons.get_mut("result window").expect("No result window").visible = true;
+
+            if board_state.is_in_check(Side::White) {
+                buttons.get_mut("result window").expect("No result window").text = "Black wins".to_string();
+            }
+            else if board_state.is_in_check(Side::Black) {
+                buttons.get_mut("result window").expect("No result window").text = "White wins".to_string();
+            }
+            else {
+                buttons.get_mut("result window").expect("No result window").text = "Draw".to_string();
+            }
+        }
 
         // draw the state of affairs
         draw_screen(&game_mode, &board_state, &squares, &perspective, &buttons, &piece_textures);
@@ -812,6 +829,21 @@ fn spawn_go_to_main_button() -> Button { // todo: positioning of this button
         text_size: FONT_SIZE/2,
         color: BUTTON_COLOR,
         text_color: BUTTON_TEXT_COLOR,
+        visible: false,
+        shaded: false,
+    }
+}
+
+fn spawn_game_winner_button() -> Button {
+    Button {
+        relative_x: 0.35,
+        relative_y: 0.45,
+        width: 300.,
+        height: 100.,
+        text: String::from(""),
+        text_size: FONT_SIZE,
+        color: Color::new(200.0/256.0, 200.0/256.0, 200.0/256.0, 0.6),
+        text_color: Color::new(0.0/256.0, 0.0/256.0, 0.0/256.0, 1.),
         visible: false,
         shaded: false,
     }
