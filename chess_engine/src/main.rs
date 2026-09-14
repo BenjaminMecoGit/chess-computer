@@ -303,10 +303,16 @@ async fn main() {
                                 squares[(clicked_square%8) as usize][(clicked_square/8) as usize].highlight = false;
                                 selected_square = None;
                             }
-                            else if board_state.side_to_move == player_side || game_mode == GameMode::Friend { 
+                            else if game_mode == GameMode::Friend || board_state.side_to_move == player_side { 
                                 // attempt to make the suggested move on the board if it is the player's move     
 
-                                let suggested_move: Move = coordinates_to_move(&board_state, old_square, clicked_square);
+                                let suggested_move: Move;
+                                if perspective == Side::White {
+                                    suggested_move = coordinates_to_move(&board_state, old_square, clicked_square);
+                                }
+                                else {
+                                    suggested_move = coordinates_to_move(&board_state, 63 - old_square, 63 - clicked_square);
+                                }
 
                                 if board_state.is_legal_move(&suggested_move) {
                                     
@@ -346,7 +352,10 @@ async fn main() {
                         }
                         else {
                             // a square can only become selected if it contains a piece of the right color
-                            if board_state.is_side_at(clicked_square, board_state.side_to_move) {
+                            if 
+                                perspective == Side::White && board_state.is_side_at(clicked_square, board_state.side_to_move) ||
+                                perspective == Side::Black && board_state.is_side_at(63 - clicked_square, board_state.side_to_move)
+                            {
                                 squares[(clicked_square%8) as usize][(clicked_square/8) as usize].highlight = true;
                                 selected_square = Some(clicked_square);
                             }
@@ -375,7 +384,7 @@ async fn main() {
                         analysis_tree.traverse();
                     }
 
-                    // then, if it is time, we let the computer make a move.
+                    // then, when it is time, we let the computer make a move.
                     if get_time() - computer_ref_time > COMPUTER_THINK {
 
                         // if the computer has a legal move to play, then do so
@@ -399,8 +408,15 @@ async fn main() {
                             }
                                     
                             // new highlighted squares
-                            squares[(old_square%8) as usize][(old_square/8) as usize].highlight = true;
-                            squares[(new_square%8) as usize][(new_square/8) as usize].highlight = true;
+                            if perspective == Side::White {
+                                squares[(old_square%8) as usize][(old_square/8) as usize].highlight = true;
+                                squares[(new_square%8) as usize][(new_square/8) as usize].highlight = true;
+                            }
+                            else {
+                                squares[7 - (old_square%8) as usize][7 - (old_square/8) as usize].highlight = true;
+                                squares[7 - (new_square%8) as usize][7 - (new_square/8) as usize].highlight = true;
+                            }
+                            
                         }
                         
                     }
@@ -547,18 +563,28 @@ fn draw_chess_board(
     piece_textures: &ChessTextures,
     perspective: &Side,
 ) {
+    // the empty board is the same from both persepctives
     draw_empty_board(squares);
     
     let offset_x: f32 = screen_width()/2.0 - 4.0 * SQUARE_SIZE + (SQUARE_SIZE - PIECE_SIZE)/2.0;
     let offset_y: f32 = screen_height()/2.0 - 4.0 * SQUARE_SIZE + (SQUARE_SIZE - PIECE_SIZE)/2.0;
 
-    // draw all the pieces
+    // draw all the pieces, with respect to perspective
     
     for piece in &board_state.pieces {
 
+        let mut p_x: f32 = (piece.square%8) as f32;
+        let mut p_y: f32 = (piece.square/8) as f32;
+
+        if *perspective == Side::Black {
+            p_x = 7. - p_x;
+            p_y = 7. - p_y;
+        }
+
+
         draw_texture_ex(texture(&piece, 
                                 piece_textures), 
-                                offset_x + ((piece.square%8) as f32) * SQUARE_SIZE, offset_y + ((piece.square/8) as f32) * SQUARE_SIZE, 
+                                offset_x + p_x * SQUARE_SIZE, offset_y + p_y * SQUARE_SIZE, 
                                 WHITE,
                                 DrawTextureParams{
                                     dest_size: Some(vec2(PIECE_SIZE, PIECE_SIZE)),
