@@ -1,4 +1,9 @@
-const KING_PROXIMITY_WEIGHT: f64 = 0.05;
+const KING_PROXIMITY: f64 = 0.2;
+const PAWN_ADVANCE: f64 = 0.05;
+const KNIGHT_SIDE: f64 = 0.02;
+const KING_SIDE: f64 = 0.01;
+const BISHOP_MOVEMENT: f64 = 0.05;
+const ATTACKING_BISHOP: f64 = 3.;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BoardState {
@@ -11,22 +16,21 @@ pub struct BoardState {
     pub en_passant: Option<(i8,i8)>,
 }
 
-
-
 // methods for evaluating a position at face value
 impl BoardState {
 
-    // for now this just returns the material balance
     pub fn evaluation(&self) -> f64 {
 
         let mut res:f64 = 0.;
 
-        // calculate king position
+        // calculates the material balance while also finding the king position and total amount of pieces
         let mut white_king: i8 = -1;
         let mut black_king: i8 = -1;
+        let mut total_pieces: f64 = 0.;
 
-        // calculates material and finds the kings along the way
         for piece in &self.pieces {
+            total_pieces += 1.;
+
             if piece.kind == PieceKind::King {
                 if piece.side == Side::White {
                     white_king = piece.square;
@@ -46,23 +50,97 @@ impl BoardState {
             };
         }
 
-        // add some value to being close to the enemy king
+        // various strategic evaluations of the position
         for piece in &self.pieces {
-            if piece.side == Side::Black && white_king > -1 {
-                res += taper(((white_king%8 - piece.square%8).abs() + (white_king/8 - piece.square/8).abs()) as f64)*KING_PROXIMITY_WEIGHT;
-            }
+            
+            let sign: f64 = match piece.side {
+                Side::White => 1.,
+                Side::Black => -1.,
+            };
 
-            if piece.side == Side::White && black_king > -1 {
-                res -= taper(((black_king%8 - piece.square%8).abs() + (black_king/8 - piece.square/8).abs()) as f64)*KING_PROXIMITY_WEIGHT;
+            let king_distance: f64 = match piece.side {
+                Side::Black => ((white_king%8 - piece.square%8).abs() + (white_king/8 - piece.square/8).abs()) as f64,
+                Side::White => ((black_king%8 - piece.square%8).abs() + (black_king/8 - piece.square/8).abs()) as f64,
+            };
+
+            // value for being close to the king, this is more important the fewer pieces there are on the board
+            res += -sign*king_distance*KING_PROXIMITY/(1. + total_pieces).sqrt();
+                    
+            match piece.kind {
+                PieceKind::King => {
+                    // the King is valuable when there are no opposing pieces nearby
+
+                    // the King is in trouble when close to the edge
+                    let v: f64 = (piece.square%8) as f64;
+                    let w: f64 = (piece.square/8) as f64;
+                    res += sign*(7.*v - v*v + 7.*w - w*w)*KING_SIDE/total_pieces;
+                },
+                PieceKind::Queen => {
+                    // Queens are extra valuable when they are attacking close to the king
+                    res += -sign*king_distance*KING_PROXIMITY/2.;
+                },
+                PieceKind::Rook => {
+                    // rooks are valuable on open files
+                    
+                },
+                PieceKind::Bishop => {
+                    // Bishops tend to be valuable on long diagonals with lots of movement
+                    // this piece can move on diagonals until there is a collision
+                        let mut movement: f64 = 0.;
+                        let directions: [i8; 4] = [-9,-7,7,9];
+
+                        for d in directions {
+                            let mut pos: i8 = piece.square;
+                            loop { 
+                                if d == -9 && (pos < 8 || pos%8 == 0) {
+                                    break;
+                                }
+                                else if d == -7 && (pos < 8 || pos%8 == 7) {
+                                    break;
+                                }
+                                else if d == 9 && (pos > 55 || pos%8 == 7) {
+                                    break;
+                                }
+                                else if d == 7 && (pos > 55 || pos%8 == 0) {
+                                    break;
+                                }
+                                else {
+                                    pos += d;
+                                }
+
+                                if self.is_piece_at(pos) {
+                                    if !self.is_side_at(pos, self.side_to_move) {
+                                        // this means an attacking bishop is important
+                                        movement += ATTACKING_BISHOP;
+                                    }
+                                    break;
+                                }
+                                movement += 1.;
+                            }
+                        }
+                    res += sign*movement*BISHOP_MOVEMENT;
+
+                },
+                PieceKind::Knight => {
+                    // "a knight on the rim is dim"
+                    let v: f64 = (piece.square%8) as f64;
+                    res += sign*(7.*v - v*v)*KNIGHT_SIDE;
+                },
+                PieceKind::Pawn => {
+                    // a pawn is worth more the further advanced it is
+                    if piece.side == Side::White {
+                        res += ((7 - piece.square/8) as f64)*PAWN_ADVANCE;
+                    }
+                    else {
+                        res -= ((piece.square/8) as f64)*PAWN_ADVANCE;
+                    }
+                },
             }
+            
         }
 
         return res;
     }
-}
-
-fn taper(x: f64) -> f64 {
-    return (1. + x.abs()).sqrt();
 }
 
 // methods for making and getting legal moves on the board
@@ -451,7 +529,6 @@ impl BoardState {
                                 res.push(Move::Standard(from,pos));
                             }
                         }
-                        
                     }, 
                     PieceKind::Knight => {
 

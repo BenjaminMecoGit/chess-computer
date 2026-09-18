@@ -311,5 +311,5 @@ impl AnalysisNode {
 
 // returns a value normalizes between -1 and 1, given an evaluation
 fn eval_to_mc(evaluation: f64) -> f64 {
-    return -1. + 2./(1. + (-evaluation/5.).exp());
+    return -1. + 2./(1. + (-evaluation/8.).exp());
 } 
